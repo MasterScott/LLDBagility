@@ -1,7 +1,7 @@
 **/*.dylib
-**/__pycache__/
 **/*.pyc
-FDPutils/build/
-!FDPutils/build/CMakeLists.txt
-FDPutils/PyFDP/PyFDP.egg-info/
-KDPutils/kdputils.egg-info/
+**/*.so
+**/__pycache__/
+FDP/build/
+FDP/PyFDP/PyFDP.egg-info/
+kdputils/kdputils.egg-info/
