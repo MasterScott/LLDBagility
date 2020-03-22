@@ -1,49 +1,42 @@
 #!/usr/bin/env python3
+import datetime
 import pathlib
 import shutil
 import subprocess
 import sys
 
-DIR_VBOX_BUILD = pathlib.Path.home() / "LLDBagility-build-vbox"
-
-
-def _exec_cmd(args):
-    return subprocess.run(args, check=True, stderr=sys.stderr, stdout=sys.stdout)
+DIRPATH_VBOX_BUILD = pathlib.Path.home() / "LLDBagility-vbox-build"
 
 
 if __name__ == "__main__":
-    shutil.rmtree(DIR_VBOX_BUILD, ignore_errors=True)
-    DIR_VBOX_BUILD.mkdir(parents=True)
+    shutil.rmtree(DIRPATH_VBOX_BUILD, ignore_errors=True)
+    DIRPATH_VBOX_BUILD.mkdir(parents=True)
 
-    BUILD_VBOX_SCRIPT = DIR_VBOX_BUILD / "build.sh"
-    with open(BUILD_VBOX_SCRIPT, "w") as f:
+    starttime = datetime.datetime.now()
+    SCRIPT_VBOX_BUILD = DIRPATH_VBOX_BUILD / "build.sh"
+    with open(SCRIPT_VBOX_BUILD, "w") as f:
         f.write(
             f"""\
-cat > "{DIR_VBOX_BUILD}/LocalConfig.kmk" <<EOF
-VBOX_WITH_TESTSUITE             :=
-VBOX_WITH_TESTCASES             :=
-
-kBuildGlobalDefaults_LD_DEBUG   :=
+cat > "{DIRPATH_VBOX_BUILD}/LocalConfig.kmk" <<EOF
+VBOX_WITH_DARWIN_R0_DARWIN_IMAGE_VERIFICATION =
+VBOX_WITH_TESTSUITE =
+VBOX_WITH_TESTCASES =
+kBuildGlobalDefaults_LD_DEBUG =
 EOF
-
-export PATH="/usr/local/opt/ccache/libexec:$PATH"
 
 ./configure\
     --disable-hardening\
-    --disable-extpack\
     --disable-java\
     --disable-python\
     --disable-docs\
+    --with-qt-dir="/opt/local/libexec/qt5"\
     --with-openssl-dir="/usr/local/opt/openssl"\
     --with-xcode-dir="tools/darwin.amd64/xcode/v6.2/x.app"\
-    --out-path="{DIR_VBOX_BUILD}"
+    --out-path="{DIRPATH_VBOX_BUILD}"
 
-source "{DIR_VBOX_BUILD}/env.sh"
+source "{DIRPATH_VBOX_BUILD}/env.sh"
 kmk
-
-find "{DIR_VBOX_BUILD}" -type d -name ".dSYM" -delete
 """
         )
-    _exec_cmd(["bash", BUILD_VBOX_SCRIPT])
-
-    print("Done!")
+    subprocess.check_output(["/usr/bin/env", "bash", SCRIPT_VBOX_BUILD])
+    print("Done in {}".format(datetime.datetime.now() - starttime))

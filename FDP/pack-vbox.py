@@ -1,143 +1,76 @@
 #!/usr/bin/env python3
 import collections
+import datetime
 import pathlib
 import shutil
 import subprocess
 import sys
 
-DIR_VBOX_BUILD = pathlib.Path.home() / "LLDBagility-build-vbox"
-DIR_VBOX_OUT = pathlib.Path.home() / "LLDBagility-out-vbox"
-DIR_VBOX_OUT_VBOX = DIR_VBOX_OUT / "VirtualBox.app"
-DIR_VBOX_OUT_LIBS = DIR_VBOX_OUT / "VirtualBox.app/Contents/libs"
+DIRPATH_VBOX_BUILD = pathlib.Path.home() / "LLDBagility-vbox-build"
+
+DIRPATH_VBOX = pathlib.Path.home() / "LLDBagility-vbox"
+DIRPATH_VBOX_LIBS = DIRPATH_VBOX / "libs"
+
+DIRPATH_MACPORTS_LIBS = pathlib.Path("/opt/local")
 
 
-def _exec_cmd(args):
-    return subprocess.run(args, check=True, stderr=sys.stderr, stdout=sys.stdout)
+def _install_name_change(libpath, newlibpath, fpath):
+    return subprocess.check_output(["install_name_tool", "-change", libpath, newlibpath, fpath])
 
 
 def _get_libs(fpath):
     output = subprocess.check_output(["otool", "-L", fpath])
-    libs = list()
     for line in output.splitlines()[1:]:
-        lpath = pathlib.Path(line[: line.index(b" ")].strip().decode("ascii"))
-        if lpath.is_file():
-            libs.append(lpath)
-    return libs
+        libpath = pathlib.Path(line[: line.index(b" ")].strip().decode("ascii"))
+        if libpath.is_file():
+            yield libpath
 
 
-def _install_name_change(lpath, newlpath, fpath):
-    return _exec_cmd(["install_name_tool", "-change", lpath, newlpath, fpath])
+def _is_macports_lib(fpath):
+    return DIRPATH_MACPORTS_LIBS in fpath.parents
 
 
-def _is_port_lib(fpath):
-    return "opt/local/lib" in str(fpath)
+def _copy_in_libs(libpath, newlibpath):
+    assert libpath.is_file()
+    assert not newlibpath.is_file()
+    newlibpath.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(libpath, newlibpath)
+    newlibpath.chmod(0o644)
+
+
+def _patch_reference(fpath, libpath, newlibpath):
+    assert newlibpath.is_file()
+    newlibpath = "@loader_path/{}{}".format(
+        "../" * (len(fpath.relative_to(DIRPATH_VBOX).parts) - 1), newlibpath.relative_to(DIRPATH_VBOX)
+    )
+    _install_name_change(libpath, newlibpath, fpath)
 
 
 if __name__ == "__main__":
-    shutil.rmtree(DIR_VBOX_OUT, ignore_errors=True)
-    shutil.copytree(DIR_VBOX_BUILD / "darwin.amd64/release/dist", DIR_VBOX_OUT)
+    assert DIRPATH_VBOX in DIRPATH_VBOX_LIBS.parents
+    shutil.rmtree(DIRPATH_VBOX, ignore_errors=True)
+    shutil.copytree(DIRPATH_VBOX_BUILD / "darwin.amd64/release/dist", DIRPATH_VBOX)
 
-    _exec_cmd(["/opt/local/libexec/qt5/bin/macdeployqt", DIR_VBOX_OUT_VBOX])
+    DIRPATH_VBOX_LIBS.mkdir(parents=True)
 
-    print("Fixing macdeployqt...")
-    _install_name_change(
-        "/opt/local/libexec/qt5/lib/QtGui.framework/Versions/5/QtGui",
-        "@rpath/QtGui.framework/Version/5/QtGui",
-        DIR_VBOX_OUT_VBOX / "Contents/Frameworks/QtMacExtras.framework/Versions/5/QtMacExtras",
-    )
-    _install_name_change(
-        "/opt/local/libexec/qt5/lib/QtCore.framework/Versions/5/QtCore",
-        "@rpath/QtCore.framework/Version/5/QtCore",
-        DIR_VBOX_OUT_VBOX / "Contents/Frameworks/QtMacExtras.framework/Versions/5/QtMacExtras",
-    )
-
-    _install_name_change(
-        "/opt/local/libexec/qt5/lib/QtCore.framework/Versions/5/QtCore",
-        "@rpath/QtCore.framework/Version/5/QtCore",
-        DIR_VBOX_OUT_VBOX / "Contents/Frameworks/QtGui.framework/Versions/5/QtGui",
-    )
-
-    _install_name_change(
-        "/opt/local/libexec/qt5/lib/QtGui.framework/Versions/5/QtGui",
-        "@rpath/QtGui.framework/Version/5/QtGui",
-        DIR_VBOX_OUT_VBOX / "Contents/Frameworks/QtWidgets.framework/Versions/5/QtWidgets",
-    )
-    _install_name_change(
-        "/opt/local/libexec/qt5/lib/QtCore.framework/Versions/5/QtCore",
-        "@rpath/QtCore.framework/Version/5/QtCore",
-        DIR_VBOX_OUT_VBOX / "Contents/Frameworks/QtWidgets.framework/Versions/5/QtWidgets",
-    )
-
-    _install_name_change(
-        "/opt/local/libexec/qt5/lib/QtWidgets.framework/Versions/5/QtWidgets",
-        "@rpath/QtWidgets.framework/Version/5/QtWidgets",
-        DIR_VBOX_OUT_VBOX / "Contents/Frameworks/QtPrintSupport.framework/Versions/5/QtPrintSupport",
-    )
-    _install_name_change(
-        "/opt/local/libexec/qt5/lib/QtGui.framework/Versions/5/QtGui",
-        "@rpath/QtGui.framework/Version/5/QtGui",
-        DIR_VBOX_OUT_VBOX / "Contents/Frameworks/QtPrintSupport.framework/Versions/5/QtPrintSupport",
-    )
-    _install_name_change(
-        "/opt/local/libexec/qt5/lib/QtCore.framework/Versions/5/QtCore",
-        "@rpath/QtCore.framework/Version/5/QtCore",
-        DIR_VBOX_OUT_VBOX / "Contents/Frameworks/QtPrintSupport.framework/Versions/5/QtPrintSupport",
-    )
-
-    _install_name_change(
-        "/opt/local/libexec/qt5/lib/QtWidgets.framework/Versions/5/QtWidgets",
-        "@rpath/QtWidgets.framework/Version/5/QtWidgets",
-        DIR_VBOX_OUT_VBOX / "Contents/Frameworks/QtOpenGL.framework/Versions/5/QtOpenGL",
-    )
-    _install_name_change(
-        "/opt/local/libexec/qt5/lib/QtGui.framework/Versions/5/QtGui",
-        "@rpath/QtGui.framework/Version/5/QtGui",
-        DIR_VBOX_OUT_VBOX / "Contents/Frameworks/QtOpenGL.framework/Versions/5/QtOpenGL",
-    )
-    _install_name_change(
-        "/opt/local/libexec/qt5/lib/QtCore.framework/Versions/5/QtCore",
-        "@rpath/QtCore.framework/Version/5/QtCore",
-        DIR_VBOX_OUT_VBOX / "Contents/Frameworks/QtOpenGL.framework/Versions/5/QtOpenGL",
-    )
-
-    print("Finding dependencies...")
-    paths_to_process = collections.deque(DIR_VBOX_OUT.rglob("*"))
-    paths_already_processed = set()
-    deps = set()
-    while paths_to_process:
-        path = paths_to_process.pop()
-        if not path.is_file() or path in paths_already_processed:
+    starttime = datetime.datetime.now()
+    fpaths_to_process = collections.deque(DIRPATH_VBOX.rglob("*"))
+    fpaths_already_processed = set()
+    fpaths_already_saved = set()
+    while fpaths_to_process:
+        fpath = fpaths_to_process.pop()
+        assert DIRPATH_VBOX in fpath.parents
+        if not fpath.is_file() or fpath in fpaths_already_processed:
             continue
-        paths_already_processed.add(path)
+        fpaths_already_processed.add(fpath)
 
-        for lpath in _get_libs(path):
-            paths_to_process.append(lpath)
-            if _is_port_lib(lpath) and "qt5" not in str(lpath):
-                deps.add(lpath)
+        for libpath in _get_libs(fpath):
+            if _is_macports_lib(libpath):
+                newlibpath = DIRPATH_VBOX_LIBS / libpath.relative_to(libpath.anchor)
+                if libpath not in fpaths_already_saved:
+                    _copy_in_libs(libpath, newlibpath)
+                    fpaths_already_saved.add(libpath)
+                    fpaths_to_process.append(newlibpath)
+                _patch_reference(fpath, libpath, newlibpath)
 
-    print("Saving dependencies...")
-    shutil.rmtree(DIR_VBOX_OUT_LIBS, ignore_errors=True)
-    DIR_VBOX_OUT_LIBS.mkdir(parents=True)
-    for lpath in deps:
-        srcpath = lpath
-        dstpath = DIR_VBOX_OUT_LIBS / lpath.name
-        shutil.copyfile(srcpath, dstpath)
-        dstpath.chmod(0o644)
-
-    print("Patching references...")
-    for path in DIR_VBOX_OUT.rglob("*"):
-        if not path.is_file():
-            continue
-
-        for lpath in _get_libs(path):
-            if _is_port_lib(lpath) and "qt5" not in str(lpath):
-                newlpath = "@executable_path/../libs/" + lpath.name
-                _install_name_change(lpath, newlpath, path)
-
-    _install_name_change(
-        "@executable_path/../libs/libz.1",
-        "@executable_path/../libs/libz.dylib",
-        DIR_VBOX_OUT_VBOX / "Contents/Frameworks/QtWidgets.framework/Versions/5/QtWidgets",
-    )
-
-    print("Done!")
+    print("Done in {}".format(datetime.datetime.now() - starttime))

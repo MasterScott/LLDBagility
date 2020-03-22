@@ -1,82 +1,41 @@
-diff --git a/Config.kmk b/Config.kmk
-index f185afbd..f62e4264 100644
---- a/Config.kmk
-+++ b/Config.kmk
-@@ -958,7 +958,7 @@ endif
- # Continue to support Vista w/o any service pack, at least for now.
- VBOX_WITH_VISTA_NO_SP = 1
- # Enable image verification on darwin @bugref{9232}.
--VBOX_WITH_DARWIN_R0_DARWIN_IMAGE_VERIFICATION = 1
-+#VBOX_WITH_DARWIN_R0_DARWIN_IMAGE_VERIFICATION = 0
- ## @}
- 
- 
-@@ -1710,9 +1710,9 @@ ifdef VBOX_WITH_RAW_MODE
- endif
- 
- # Don't flood CDEFS, old MASMs doesn't like too many defines.
--ifdef VBOX_WITH_DEBUGGER
-+#ifdef VBOX_WITH_DEBUGGER
-  CDEFS += VBOX_WITH_DEBUGGER
--endif
-+#endif
- ifdef VBOX_WITH_HARDENING
-  CDEFS += VBOX_WITH_HARDENING
- endif
 diff --git a/configure b/configure
-index feeaae25..bd812daa 100755
+index feeaae25..644377fd 100755
 --- a/configure
 +++ b/configure
-@@ -152,7 +152,8 @@ INCVPX=""
- LIBVPX="-lvpx"
- PKGCONFIG="`which_wrapper pkg-config`"
- PYTHONDIR="/usr /usr/local"
--QT5DIR="/usr/lib/qt5 /usr/share/qt5 /usr/lib64/qt5 /usr /usr/local"
-+#QT5DIR="/usr/lib/qt5 /usr/share/qt5 /usr/lib64/qt5 /usr /usr/local"
-+QT5DIR="/usr/lib/qt5 /usr/share/qt5 /usr/lib64/qt5 /usr /usr/local /opt/local/libexec/qt5"
- QT5DIR_PKGCONFIG=1
- QT5MAJ=5
- QT5MIN=6
-@@ -1504,7 +1505,8 @@ EOF
+@@ -1504,7 +1504,7 @@ EOF
      # Now try the user provided directory and some of the standard directories.
      QT_TRIES="$QT5DIR /System/Library /Library"
      for t in $QT_TRIES; do
 -      if [ -f "$t/Frameworks/QtCore.framework/QtCore" ]; then
-+      #if [ -f "$t/Frameworks/QtCore.framework/QtCore" ]; then
 +      if [ -f "$t/lib/QtCore.framework/QtCore" ]; then
          PATH_SDK_QT5="$t"
          break
        fi
-@@ -1512,8 +1514,10 @@ EOF
+@@ -1512,8 +1512,8 @@ EOF
      # Add the necessary params for building the test application
      if [ -n "$PATH_SDK_QT5" ]; then
        foundqt5=1
 -      INCQT5=-I$PATH_SDK_QT5/Frameworks/QtCore.framework/Headers
 -      LIBQT5=-F$PATH_SDK_QT5/Frameworks
-+      #INCQT5=-I$PATH_SDK_QT5/Frameworks/QtCore.framework/Headers
-+      #LIBQT5=-F$PATH_SDK_QT5/Frameworks
 +      INCQT5=-I$PATH_SDK_QT5/lib/QtCore.framework/Headers
 +      LIBQT5=-F$PATH_SDK_QT5/lib
        FLGQT5="-framework QtCore"
      else
        log_failure "Qt5 framework not found (can be disabled using --disable-qt)"
-@@ -1594,9 +1598,12 @@ EOF
+@@ -1594,9 +1594,9 @@ EOF
          if [ "$OS" = "darwin" ]; then
            # Successful build & run the test application so add the necessary
            # params to AutoConfig.kmk:
 -          cnf_append "PATH_SDK_QT5_INC" "$PATH_SDK_QT5/Frameworks"
 -          cnf_append "PATH_SDK_QT5_LIB" "$PATH_SDK_QT5/Frameworks"
 -          cnf_append "PATH_SDK_QT5" "$PATH_SDK_QT5/Frameworks"
-+          #cnf_append "PATH_SDK_QT5_INC" "$PATH_SDK_QT5/Frameworks"
-+          #cnf_append "PATH_SDK_QT5_LIB" "$PATH_SDK_QT5/Frameworks"
-+          #cnf_append "PATH_SDK_QT5" "$PATH_SDK_QT5/Frameworks"
 +          cnf_append "PATH_SDK_QT5_INC" "$PATH_SDK_QT5/inc"
 +          cnf_append "PATH_SDK_QT5_LIB" "$PATH_SDK_QT5/lib"
 +          cnf_append "PATH_SDK_QT5" "$PATH_SDK_QT5"
            # Check for the moc tool in the Qt directory found & some standard
            # directories.
            for q in $PATH_SDK_QT5 /usr /Developer/Tools/Qt; do
-@@ -2196,6 +2203,14 @@ check_darwinversion()
+@@ -2196,6 +2196,14 @@ check_darwinversion()
    test_header "Darwin version"
    darwin_ver=`uname -r`
    case "$darwin_ver" in
@@ -1427,14 +1386,13 @@ index 7a5c2ea0..a138fa8f 100644
       * Check what the configuration says.
       */
 diff --git a/src/VBox/Debugger/Makefile.kmk b/src/VBox/Debugger/Makefile.kmk
-index af27bc38..5ec70cea 100644
+index af27bc38..43ace445 100644
 --- a/src/VBox/Debugger/Makefile.kmk
 +++ b/src/VBox/Debugger/Makefile.kmk
-@@ -33,7 +33,7 @@ endif # VBOX_WITH_DEBUGGER
- # Debugger library - linked into VBoxVMM.
+@@ -34,6 +34,7 @@ endif # VBOX_WITH_DEBUGGER
  #
  Debugger_TEMPLATE  = VBOXR3
--Debugger_DEFS      = IN_VMM_R3 IN_DBG_R3 IN_DIS
+ Debugger_DEFS      = IN_VMM_R3 IN_DBG_R3 IN_DIS
 +Debugger_DEFS      = IN_VMM_R3 IN_DBG_R3 IN_DIS USING_VMM_COMMON_DEFS
  ifneq ($(KBUILD_TYPE),release)
   Debugger_DEFS    += VBOX_WITH_DEBUGGER_TCP_BY_DEFAULT
